@@ -3,7 +3,7 @@ import sys
 
 import requests
 
-BRIDGE_URL = "http://192.168.1.10:8000/classify"
+BRIDGE_URL = "https://twotrash.wbesoft.com/classify"
 API_TOKEN = "ganti-token-rahasia-ini"
 
 with open(sys.argv[1], "rb") as f:

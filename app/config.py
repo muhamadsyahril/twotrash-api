@@ -24,3 +24,12 @@ SUMOPOD_MODEL = os.getenv("SUMOPOD_MODEL", "gpt-4o-mini")
 
 HTTP_TIMEOUT = float(os.getenv("HTTP_TIMEOUT", "30"))
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+# Vector memory: simpan gambar + label untuk few-shot / tuning
+VECTOR_STORE_ENABLED = os.getenv("VECTOR_STORE_ENABLED", "true").lower() in ("1", "true", "yes")
+DATA_DIR = os.getenv("DATA_DIR", "data")
+VECTOR_TOP_K = int(os.getenv("VECTOR_TOP_K", "3"))
+VECTOR_MIN_SIMILARITY = float(os.getenv("VECTOR_MIN_SIMILARITY", "0.72"))
+# fallback = ringan (default, tanpa torch); auto = CLIP jika ada; clip = wajib CLIP
+EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "fallback").lower()
+CLIP_MODEL = os.getenv("CLIP_MODEL", "clip-ViT-B-32")

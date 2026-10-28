@@ -77,5 +77,19 @@ SUMOPOD_SYSTEM_PROMPT = (
     )
     + "\nIf text in the photo says 'sampah kaleng minuman' or 'kaleng minuman', "
     "choose kaleng_minuman.\n"
+    "If past similar cases are provided, treat corrected=true as stronger hints.\n"
     'Reply with JSON only: {"item": "<slug>", "category": "organic"|"anorganic"|"other"}'
 )
+
+
+def format_similar_context(similar: list) -> str:
+    if not similar:
+        return ""
+    lines = ["Visually similar past cases (soft hints):"]
+    for s in similar:
+        flag = "corrected" if getattr(s, "corrected", False) else "auto"
+        lines.append(
+            f"- item={s.item} category={s.category} "
+            f"similarity={s.similarity:.2f} ({flag})"
+        )
+    return "\n".join(lines)

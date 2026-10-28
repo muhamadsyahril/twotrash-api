@@ -8,7 +8,14 @@ from dataclasses import dataclass
 import httpx
 
 from app import config
-from app.prompts import ITEM_CATEGORY, ITEM_CRITERIA, QUESTION, SUMOPOD_SYSTEM_PROMPT
+from app.memory import SimilarCase
+from app.prompts import (
+    ITEM_CATEGORY,
+    ITEM_CRITERIA,
+    QUESTION,
+    SUMOPOD_SYSTEM_PROMPT,
+    format_similar_context,
+)
 
 log = logging.getLogger("trash.classifier")
 
@@ -23,20 +30,52 @@ class Classification:
     item: str
     confidence: float | None
     source: str
+    id: str | None = None
+    similar: list[SimilarCase] | None = None
 
     def as_response(self) -> dict:
-        # Contoh: {"anorganic": true, "item": "kaleng_minuman"}
-        return {self.category: True, "item": self.item}
+        # Contoh: {"anorganic": true, "item": "kaleng_minuman", "id": "..."}
+        body = {self.category: True, "item": self.item}
+        if self.id:
+            body["id"] = self.id
+        return body
 
 
-async def classify_with_jev(client: httpx.AsyncClient, jpeg: bytes) -> Classification:
+def _with_similar(question: str, similar: list[SimilarCase] | None) -> str:
+    ctx = format_similar_context(similar or [])
+    if not ctx:
+        return question
+    return (
+        f"{question} "
+        "Use `past_similar` as soft hints from visually similar past cases "
+        "(prefer corrected=true). The current photo still decides the answer."
+    )
+
+
+async def classify_with_jev(
+    client: httpx.AsyncClient,
+    jpeg: bytes,
+    similar: list[SimilarCase] | None = None,
+) -> Classification:
     if not config.TYPESAFE_API_KEY:
         raise ClassifierError("TYPESAFE_API_KEY belum diset")
 
     ref = f"img-{uuid.uuid4()}"
+    state: dict = {"photo": ref}
+    if similar:
+        state["past_similar"] = [
+            {
+                "item": s.item,
+                "category": s.category,
+                "similarity": round(s.similarity, 3),
+                "corrected": s.corrected,
+            }
+            for s in similar
+        ]
+
     body = {
         "model": config.TYPESAFE_MODEL,
-        "state": {"photo": ref},
+        "state": state,
         "assets": {
             ref: {
                 "type": "image",
@@ -47,7 +86,7 @@ async def classify_with_jev(client: httpx.AsyncClient, jpeg: bytes) -> Classific
         "questions": {
             "item": {
                 "type": "choice",
-                "instructions": QUESTION,
+                "instructions": _with_similar(QUESTION, similar),
                 "criteria": ITEM_CRITERIA,
             }
         },
@@ -74,11 +113,20 @@ async def classify_with_jev(client: httpx.AsyncClient, jpeg: bytes) -> Classific
     return Classification(ITEM_CATEGORY[item], item, answer.get("confidence"), "jev")
 
 
-async def classify_with_sumopod(client: httpx.AsyncClient, jpeg: bytes) -> Classification:
+async def classify_with_sumopod(
+    client: httpx.AsyncClient,
+    jpeg: bytes,
+    similar: list[SimilarCase] | None = None,
+) -> Classification:
     if not config.SUMOPOD_API_KEY:
         raise ClassifierError("SUMOPOD_API_KEY belum diset")
 
     data_url = "data:image/jpeg;base64," + base64.b64encode(jpeg).decode("ascii")
+    user_text = "Classify the waste in this photo."
+    ctx = format_similar_context(similar or [])
+    if ctx:
+        user_text = f"{ctx}\n\n{user_text}"
+
     body = {
         "model": config.SUMOPOD_MODEL,
         "temperature": 0,
@@ -87,7 +135,7 @@ async def classify_with_sumopod(client: httpx.AsyncClient, jpeg: bytes) -> Class
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": "Classify the waste in this photo."},
+                    {"type": "text", "text": user_text},
                     {"type": "image_url", "image_url": {"url": data_url}},
                 ],
             },
@@ -122,11 +170,9 @@ def _parse_item(text: str) -> str:
             pass
 
     lowered = text.lower().replace("-", "_").replace(" ", "_")
-    # Label teks khusus
     if "kaleng_minuman" in lowered or "sampah_kaleng_minuman" in lowered:
         return "kaleng_minuman"
 
-    # Cocokkan slug paling panjang dulu supaya "kulit_pisang" menang atas "kulit"
     for item in sorted(ITEM_CATEGORY, key=len, reverse=True):
         if item in lowered:
             return item
@@ -134,23 +180,27 @@ def _parse_item(text: str) -> str:
     raise ClassifierError(f"Jawaban Sumopod tidak bisa dibaca: {text[:200]!r}")
 
 
-async def classify(client: httpx.AsyncClient, jpeg: bytes) -> Classification:
+async def classify(
+    client: httpx.AsyncClient,
+    jpeg: bytes,
+    similar: list[SimilarCase] | None = None,
+) -> Classification:
     mode = config.CLASSIFIER_MODE
     if mode == "jev":
-        return await classify_with_jev(client, jpeg)
+        return await classify_with_jev(client, jpeg, similar)
     if mode == "sumopod":
-        return await classify_with_sumopod(client, jpeg)
+        return await classify_with_sumopod(client, jpeg, similar)
 
     try:
-        result = await classify_with_jev(client, jpeg)
+        result = await classify_with_jev(client, jpeg, similar)
     except ClassifierError as exc:
         log.warning("Jev gagal, fallback ke Sumopod: %s", exc)
-        return await classify_with_sumopod(client, jpeg)
+        return await classify_with_sumopod(client, jpeg, similar)
 
     if result.confidence is not None and result.confidence < config.JEV_MIN_CONFIDENCE:
         log.info("Confidence Jev %.2f rendah, cek ulang ke Sumopod", result.confidence)
         try:
-            return await classify_with_sumopod(client, jpeg)
+            return await classify_with_sumopod(client, jpeg, similar)
         except ClassifierError as exc:
             log.warning("Sumopod gagal, pakai hasil Jev: %s", exc)
     return result

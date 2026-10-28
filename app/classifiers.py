@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import httpx
 
 from app import config
-from app.prompts import CRITERIA, QUESTION, SUMOPOD_SYSTEM_PROMPT
+from app.prompts import ITEM_CATEGORY, ITEM_CRITERIA, QUESTION, SUMOPOD_SYSTEM_PROMPT
 
 log = logging.getLogger("trash.classifier")
 
@@ -20,8 +20,13 @@ class ClassifierError(RuntimeError):
 @dataclass
 class Classification:
     category: str
+    item: str
     confidence: float | None
     source: str
+
+    def as_response(self) -> dict:
+        # Contoh: {"anorganic": true, "item": "kaleng_minuman"}
+        return {self.category: True, "item": self.item}
 
 
 async def classify_with_jev(client: httpx.AsyncClient, jpeg: bytes) -> Classification:
@@ -40,7 +45,11 @@ async def classify_with_jev(client: httpx.AsyncClient, jpeg: bytes) -> Classific
             }
         },
         "questions": {
-            "waste": {"type": "choice", "instructions": QUESTION, "criteria": CRITERIA}
+            "item": {
+                "type": "choice",
+                "instructions": QUESTION,
+                "criteria": ITEM_CRITERIA,
+            }
         },
     }
     try:
@@ -58,11 +67,11 @@ async def classify_with_jev(client: httpx.AsyncClient, jpeg: bytes) -> Classific
     if resp.status_code != 200:
         raise ClassifierError(f"Jev HTTP {resp.status_code}: {resp.text[:300]}")
 
-    answer = resp.json()["answers"]["waste"]
-    category = answer.get("choice")
-    if category not in config.CATEGORIES:
-        raise ClassifierError(f"Jev mengembalikan kategori tidak dikenal: {category!r}")
-    return Classification(category, answer.get("confidence"), "jev")
+    answer = resp.json()["answers"]["item"]
+    item = answer.get("choice")
+    if item not in ITEM_CATEGORY:
+        raise ClassifierError(f"Jev mengembalikan item tidak dikenal: {item!r}")
+    return Classification(ITEM_CATEGORY[item], item, answer.get("confidence"), "jev")
 
 
 async def classify_with_sumopod(client: httpx.AsyncClient, jpeg: bytes) -> Classification:
@@ -97,23 +106,31 @@ async def classify_with_sumopod(client: httpx.AsyncClient, jpeg: bytes) -> Class
         raise ClassifierError(f"Sumopod HTTP {resp.status_code}: {resp.text[:300]}")
 
     content = resp.json()["choices"][0]["message"]["content"] or ""
-    return Classification(_parse_category(content), None, "sumopod")
+    item = _parse_item(content)
+    return Classification(ITEM_CATEGORY[item], item, None, "sumopod")
 
 
-def _parse_category(text: str) -> str:
+def _parse_item(text: str) -> str:
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
         try:
-            value = str(json.loads(match.group(0)).get("category", "")).lower()
-            if value in config.CATEGORIES:
-                return value
+            payload = json.loads(match.group(0))
+            item = str(payload.get("item", "")).lower().strip()
+            if item in ITEM_CATEGORY:
+                return item
         except json.JSONDecodeError:
             pass
-    # "anorganic" mengandung "organic", jadi cek dulu yang lebih spesifik
-    lowered = text.lower()
-    for name in ("anorganic", "inorganic", "organic", "other"):
-        if name in lowered:
-            return "anorganic" if name == "inorganic" else name
+
+    lowered = text.lower().replace("-", "_").replace(" ", "_")
+    # Label teks khusus
+    if "kaleng_minuman" in lowered or "sampah_kaleng_minuman" in lowered:
+        return "kaleng_minuman"
+
+    # Cocokkan slug paling panjang dulu supaya "kulit_pisang" menang atas "kulit"
+    for item in sorted(ITEM_CATEGORY, key=len, reverse=True):
+        if item in lowered:
+            return item
+
     raise ClassifierError(f"Jawaban Sumopod tidak bisa dibaca: {text[:200]!r}")
 
 

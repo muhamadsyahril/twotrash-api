@@ -56,5 +56,11 @@ async def classify_image(request: Request, image: UploadFile | None = File(None)
         log.error("Klasifikasi gagal: %s", exc)
         raise HTTPException(status_code=502, detail="Gagal mengklasifikasi gambar") from exc
 
-    log.info("Hasil: %s (source=%s, confidence=%s)", result.category, result.source, result.confidence)
-    return {name: name == result.category for name in config.CATEGORIES}
+    log.info(
+        "Hasil: %s/%s (source=%s, confidence=%s)",
+        result.category,
+        result.item,
+        result.source,
+        result.confidence,
+    )
+    return result.as_response()

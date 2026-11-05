@@ -157,6 +157,67 @@ class VectorMemory:
         )
         return {"id": case_id, "item": item, "category": meta["category"], "corrected": True}
 
+    def list_cases(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        category: str | None = None,
+        corrected: bool | None = None,
+        item: str | None = None,
+    ) -> tuple[list[dict], int]:
+        """Daftar kasus terbaru untuk admin dashboard."""
+        if not self.enabled:
+            return [], 0
+        self._ensure()
+        raw = self._collection.get(include=["metadatas"])
+        ids = raw.get("ids") or []
+        metas = raw.get("metadatas") or []
+        rows: list[dict] = []
+        for case_id, meta in zip(ids, metas):
+            meta = meta or {}
+            cat = str(meta.get("category", ""))
+            it = str(meta.get("item", ""))
+            is_corrected = str(meta.get("corrected", "false")).lower() == "true"
+            if category and cat != category:
+                continue
+            if item and it != item:
+                continue
+            if corrected is not None and is_corrected != corrected:
+                continue
+            image_path = str(meta.get("image_path", ""))
+            rows.append(
+                {
+                    "id": case_id,
+                    "item": it,
+                    "category": cat,
+                    "source": str(meta.get("source", "")),
+                    "confidence": meta.get("confidence") or None,
+                    "corrected": is_corrected,
+                    "created_at": str(meta.get("created_at", "")),
+                    "corrected_at": str(meta.get("corrected_at", "")),
+                    "has_image": bool(image_path and Path(image_path).is_file())
+                    or (self.images_dir / f"{case_id}.jpg").is_file(),
+                }
+            )
+        rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+        total = len(rows)
+        return rows[offset : offset + limit], total
+
+    def image_path_for(self, case_id: str) -> Path | None:
+        if not self.enabled:
+            return None
+        self._ensure()
+        existing = self._collection.get(ids=[case_id], include=["metadatas"])
+        if not existing["ids"]:
+            return None
+        meta = existing["metadatas"][0] or {}
+        stored = Path(str(meta.get("image_path", ""))) if meta.get("image_path") else None
+        if stored and stored.is_file():
+            return stored
+        fallback = self.images_dir / f"{case_id}.jpg"
+        return fallback if fallback.is_file() else None
+
     def stats(self) -> dict:
         if not self.enabled:
             return {"enabled": False, "count": 0}

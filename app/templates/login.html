@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Login · TwoTrash Admin{% endblock %}
+{% block head %}
+<style>
+  .login-shell {
+    min-height: 100vh; display: grid; place-items: center; padding: 2rem 1rem;
+  }
+  .login-card {
+    width: min(420px, 100%);
+    background: linear-gradient(180deg, rgba(34,43,28,.95), rgba(26,33,22,.98));
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    padding: 2rem 1.75rem 1.75rem;
+  }
+  .login-card h1 {
+    margin: 0 0 .35rem; font-size: 1.7rem; letter-spacing: -.03em;
+  }
+  .login-card p { margin: 0 0 1.5rem; color: var(--muted); }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 0 0 .4rem; }
+  input {
+    width: 100%; border-radius: 12px; border: 1px solid var(--line);
+    background: #151b12; color: var(--text); padding: .8rem .9rem;
+    font: inherit; margin-bottom: 1rem;
+  }
+  input:focus { outline: 2px solid rgba(198,243,85,.35); border-color: #6e8a3a; }
+  .login-card .btn-primary { width: 100%; padding: .85rem 1rem; margin-top: .25rem; }
+</style>
+{% endblock %}
+{% block body %}
+<div class="login-shell">
+  <form class="login-card" method="post" action="/admin/login">
+    <div class="brand" style="margin-bottom:1.25rem">TwoTrash <span>admin</span></div>
+    <h1>Masuk dashboard</h1>
+    <p>Koreksi label sampah untuk fine-tune vector memory.</p>
+    {% if error %}
+    <div class="alert err">{{ error }}</div>
+    {% endif %}
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required autofocus>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button class="btn btn-primary" type="submit">Login</button>
+  </form>
+</div>
+{% endblock %}

@@ -6,5 +6,7 @@ pillow>=10.4
 python-dotenv>=1.0
 numpy>=1.26
 chromadb>=0.5
+jinja2>=3.1
+itsdangerous>=2.2
 # Opsional (lebih akurat): pip install sentence-transformers torch
 # lalu set EMBEDDING_BACKEND=clip

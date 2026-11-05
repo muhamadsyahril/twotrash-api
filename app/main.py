@@ -6,8 +6,10 @@ import httpx
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
+from starlette.middleware.sessions import SessionMiddleware
 
 from app import config
+from app.admin import router as admin_router
 from app.classifiers import ClassifierError, classify
 from app.image_utils import InvalidImageError, prepare_jpeg
 from app.memory import memory
@@ -32,6 +34,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Trash Sorter Bridge", lifespan=lifespan)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=config.ADMIN_SESSION_SECRET,
+    session_cookie="twotrash_admin",
+    same_site="lax",
+    https_only=False,
+)
+app.include_router(admin_router)
 
 
 class FeedbackBody(BaseModel):

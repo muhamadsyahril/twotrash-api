@@ -33,3 +33,8 @@ VECTOR_MIN_SIMILARITY = float(os.getenv("VECTOR_MIN_SIMILARITY", "0.72"))
 # fallback = ringan (default, tanpa torch); auto = CLIP jika ada; clip = wajib CLIP
 EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "fallback").lower()
 CLIP_MODEL = os.getenv("CLIP_MODEL", "clip-ViT-B-32")
+
+# Admin dashboard (session cookie)
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "zero1234")
+ADMIN_SESSION_SECRET = os.getenv("ADMIN_SESSION_SECRET", "ganti-secret-admin-session")

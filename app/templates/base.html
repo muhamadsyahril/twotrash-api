@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}TwoTrash Admin{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #12160f;
+      --bg-2: #1a2116;
+      --panel: #222b1c;
+      --line: #35402c;
+      --text: #e8eedf;
+      --muted: #9aab8a;
+      --accent: #c6f355;
+      --accent-ink: #1a2408;
+      --organic: #7dcf8a;
+      --anorganic: #6eb6ff;
+      --other: #f0b35a;
+      --danger: #ff7a6e;
+      --ok: #8fef9a;
+      --radius: 14px;
+      --shadow: 0 18px 50px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "DM Sans", system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(198,243,85,.12), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(110,182,255,.08), transparent 50%),
+        linear-gradient(180deg, #10140d 0%, #151b11 100%);
+    }
+    a { color: var(--accent); text-decoration: none; }
+    .wrap { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1rem; padding: 1.25rem 0 0.5rem;
+    }
+    .brand {
+      display: flex; align-items: baseline; gap: .55rem;
+      font-weight: 700; letter-spacing: -.02em; font-size: 1.15rem;
+    }
+    .brand span { color: var(--accent); font-family: "IBM Plex Mono", monospace; font-size: .8rem; font-weight: 500; }
+    .muted { color: var(--muted); }
+    .btn {
+      appearance: none; border: 1px solid var(--line); background: var(--panel);
+      color: var(--text); border-radius: 999px; padding: .55rem 1rem;
+      font: inherit; font-weight: 600; cursor: pointer;
+    }
+    .btn:hover { border-color: #516145; }
+    .btn-primary {
+      background: var(--accent); color: var(--accent-ink); border-color: transparent;
+    }
+    .btn-primary:hover { filter: brightness(1.05); }
+    .btn-ghost { background: transparent; }
+    .chip {
+      display: inline-flex; align-items: center; gap: .35rem;
+      border-radius: 999px; padding: .2rem .55rem; font-size: .78rem; font-weight: 600;
+      border: 1px solid var(--line); background: rgba(255,255,255,.03);
+    }
+    .chip.organic { color: var(--organic); border-color: rgba(125,207,138,.35); }
+    .chip.anorganic { color: var(--anorganic); border-color: rgba(110,182,255,.35); }
+    .chip.other { color: var(--other); border-color: rgba(240,179,90,.35); }
+    .chip.ok { color: var(--ok); border-color: rgba(143,239,154,.35); }
+    .alert {
+      border-radius: var(--radius); padding: .85rem 1rem; margin: 1rem 0;
+      border: 1px solid var(--line); background: var(--panel);
+    }
+    .alert.ok { border-color: rgba(143,239,154,.35); color: var(--ok); }
+    .alert.err { border-color: rgba(255,122,110,.4); color: var(--danger); }
+    .mono { font-family: "IBM Plex Mono", monospace; font-size: .82rem; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  {% block body %}{% endblock %}
+</body>
+</html>

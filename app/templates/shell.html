@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">TwoTrash <span>admin</span></div>
+    <nav class="nav">
+      <a href="/admin/cases" class="{% if active=='cases' %}active{% endif %}">Kasus</a>
+      <a href="/admin/items" class="{% if active=='items' %}active{% endif %}">Item</a>
+    </nav>
+    <div class="sidebar-foot">
+      <form method="post" action="/admin/logout">
+        <button class="btn btn-ghost" type="submit" style="width:100%">Logout</button>
+      </form>
+    </div>
+  </aside>
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% endblock %}

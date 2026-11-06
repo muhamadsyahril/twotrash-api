@@ -10,7 +10,6 @@
   <style>
     :root {
       --bg: #12160f;
-      --bg-2: #1a2116;
       --panel: #222b1c;
       --line: #35402c;
       --text: #e8eedf;
@@ -24,6 +23,7 @@
       --ok: #8fef9a;
       --radius: 14px;
       --shadow: 0 18px 50px rgba(0,0,0,.35);
+      --sidebar: 248px;
     }
     * { box-sizing: border-box; }
     body {
@@ -37,28 +37,26 @@
         linear-gradient(180deg, #10140d 0%, #151b11 100%);
     }
     a { color: var(--accent); text-decoration: none; }
-    .wrap { width: min(1180px, calc(100% - 2rem)); margin: 0 auto; }
-    .topbar {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 1rem; padding: 1.25rem 0 0.5rem;
-    }
+    .muted { color: var(--muted); }
+    .mono { font-family: "IBM Plex Mono", monospace; font-size: .82rem; }
     .brand {
       display: flex; align-items: baseline; gap: .55rem;
       font-weight: 700; letter-spacing: -.02em; font-size: 1.15rem;
     }
-    .brand span { color: var(--accent); font-family: "IBM Plex Mono", monospace; font-size: .8rem; font-weight: 500; }
-    .muted { color: var(--muted); }
+    .brand span {
+      color: var(--accent); font-family: "IBM Plex Mono", monospace;
+      font-size: .8rem; font-weight: 500;
+    }
     .btn {
       appearance: none; border: 1px solid var(--line); background: var(--panel);
       color: var(--text); border-radius: 999px; padding: .55rem 1rem;
       font: inherit; font-weight: 600; cursor: pointer;
     }
     .btn:hover { border-color: #516145; }
-    .btn-primary {
-      background: var(--accent); color: var(--accent-ink); border-color: transparent;
-    }
+    .btn-primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
     .btn-primary:hover { filter: brightness(1.05); }
     .btn-ghost { background: transparent; }
+    .btn-danger { border-color: rgba(255,122,110,.45); color: var(--danger); background: transparent; }
     .chip {
       display: inline-flex; align-items: center; gap: .35rem;
       border-radius: 999px; padding: .2rem .55rem; font-size: .78rem; font-weight: 600;
@@ -69,12 +67,44 @@
     .chip.other { color: var(--other); border-color: rgba(240,179,90,.35); }
     .chip.ok { color: var(--ok); border-color: rgba(143,239,154,.35); }
     .alert {
-      border-radius: var(--radius); padding: .85rem 1rem; margin: 1rem 0;
+      border-radius: var(--radius); padding: .85rem 1rem; margin: 0 0 1rem;
       border: 1px solid var(--line); background: var(--panel);
     }
     .alert.ok { border-color: rgba(143,239,154,.35); color: var(--ok); }
     .alert.err { border-color: rgba(255,122,110,.4); color: var(--danger); }
-    .mono { font-family: "IBM Plex Mono", monospace; font-size: .82rem; }
+
+    .shell { display: grid; grid-template-columns: var(--sidebar) 1fr; min-height: 100vh; }
+    .sidebar {
+      position: sticky; top: 0; height: 100vh;
+      border-right: 1px solid var(--line);
+      background: rgba(18,22,15,.92);
+      backdrop-filter: blur(10px);
+      padding: 1.25rem 1rem;
+      display: flex; flex-direction: column; gap: 1.25rem;
+    }
+    .nav { display: grid; gap: .35rem; }
+    .nav a {
+      display: block; color: var(--text); padding: .7rem .85rem;
+      border-radius: 12px; border: 1px solid transparent; font-weight: 600;
+    }
+    .nav a:hover { background: rgba(255,255,255,.03); border-color: var(--line); }
+    .nav a.active {
+      background: rgba(198,243,85,.12);
+      border-color: rgba(198,243,85,.28);
+      color: var(--accent);
+    }
+    .sidebar-foot { margin-top: auto; }
+    .content { padding: 1.25rem 1.5rem 2.5rem; min-width: 0; }
+    .content-head { margin-bottom: 1rem; }
+    .content-head h1 { margin: .2rem 0 .35rem; letter-spacing: -.03em; font-size: 1.55rem; }
+    @media (max-width: 860px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar {
+        position: relative; height: auto;
+        border-right: 0; border-bottom: 1px solid var(--line);
+      }
+      .nav { grid-template-columns: 1fr 1fr; }
+    }
   </style>
   {% block head %}{% endblock %}
 </head>

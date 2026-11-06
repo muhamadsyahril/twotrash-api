@@ -8,14 +8,9 @@ from dataclasses import dataclass
 import httpx
 
 from app import config
+from app.items_store import items_store
 from app.memory import SimilarCase
-from app.prompts import (
-    ITEM_CATEGORY,
-    ITEM_CRITERIA,
-    QUESTION,
-    SUMOPOD_SYSTEM_PROMPT,
-    format_similar_context,
-)
+from app.prompts import QUESTION, build_sumopod_prompt, format_similar_context
 
 log = logging.getLogger("trash.classifier")
 
@@ -34,7 +29,6 @@ class Classification:
     similar: list[SimilarCase] | None = None
 
     def as_response(self) -> dict:
-        # Contoh: {"anorganic": true, "item": "kaleng_minuman", "id": "..."}
         body = {self.category: True, "item": self.item}
         if self.id:
             body["id"] = self.id
@@ -60,6 +54,8 @@ async def classify_with_jev(
     if not config.TYPESAFE_API_KEY:
         raise ClassifierError("TYPESAFE_API_KEY belum diset")
 
+    category_map = items_store.category_map()
+    criteria_map = items_store.criteria_map()
     ref = f"img-{uuid.uuid4()}"
     state: dict = {"photo": ref}
     if similar:
@@ -87,7 +83,7 @@ async def classify_with_jev(
             "item": {
                 "type": "choice",
                 "instructions": _with_similar(QUESTION, similar),
-                "criteria": ITEM_CRITERIA,
+                "criteria": criteria_map,
             }
         },
     }
@@ -108,9 +104,9 @@ async def classify_with_jev(
 
     answer = resp.json()["answers"]["item"]
     item = answer.get("choice")
-    if item not in ITEM_CATEGORY:
+    if item not in category_map:
         raise ClassifierError(f"Jev mengembalikan item tidak dikenal: {item!r}")
-    return Classification(ITEM_CATEGORY[item], item, answer.get("confidence"), "jev")
+    return Classification(category_map[item], item, answer.get("confidence"), "jev")
 
 
 async def classify_with_sumopod(
@@ -121,6 +117,8 @@ async def classify_with_sumopod(
     if not config.SUMOPOD_API_KEY:
         raise ClassifierError("SUMOPOD_API_KEY belum diset")
 
+    category_map = items_store.category_map()
+    criteria_map = items_store.criteria_map()
     data_url = "data:image/jpeg;base64," + base64.b64encode(jpeg).decode("ascii")
     user_text = "Classify the waste in this photo."
     ctx = format_similar_context(similar or [])
@@ -131,7 +129,7 @@ async def classify_with_sumopod(
         "model": config.SUMOPOD_MODEL,
         "temperature": 0,
         "messages": [
-            {"role": "system", "content": SUMOPOD_SYSTEM_PROMPT},
+            {"role": "system", "content": build_sumopod_prompt(category_map, criteria_map)},
             {
                 "role": "user",
                 "content": [
@@ -154,26 +152,27 @@ async def classify_with_sumopod(
         raise ClassifierError(f"Sumopod HTTP {resp.status_code}: {resp.text[:300]}")
 
     content = resp.json()["choices"][0]["message"]["content"] or ""
-    item = _parse_item(content)
-    return Classification(ITEM_CATEGORY[item], item, None, "sumopod")
+    item = _parse_item(content, category_map)
+    return Classification(category_map[item], item, None, "sumopod")
 
 
-def _parse_item(text: str) -> str:
+def _parse_item(text: str, category_map: dict[str, str]) -> str:
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
         try:
             payload = json.loads(match.group(0))
             item = str(payload.get("item", "")).lower().strip()
-            if item in ITEM_CATEGORY:
+            if item in category_map:
                 return item
         except json.JSONDecodeError:
             pass
 
     lowered = text.lower().replace("-", "_").replace(" ", "_")
     if "kaleng_minuman" in lowered or "sampah_kaleng_minuman" in lowered:
-        return "kaleng_minuman"
+        if "kaleng_minuman" in category_map:
+            return "kaleng_minuman"
 
-    for item in sorted(ITEM_CATEGORY, key=len, reverse=True):
+    for item in sorted(category_map, key=len, reverse=True):
         if item in lowered:
             return item
 

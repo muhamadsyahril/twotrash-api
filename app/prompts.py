@@ -1,5 +1,6 @@
-# Item slug -> kategori (organic | anorganic | other)
-ITEM_CATEGORY = {
+# Seed default — runtime CRUD memakai app.items_store
+
+DEFAULT_ITEM_CATEGORY = {
     # Organik
     "kulit_pisang": "organic",
     "sisa_nasi": "organic",
@@ -28,8 +29,7 @@ ITEM_CATEGORY = {
     "sampah_campuran": "other",
 }
 
-# Deskripsi Choice untuk Jev / prompt Sumopod
-ITEM_CRITERIA = {
+DEFAULT_ITEM_CRITERIA = {
     "kulit_pisang": "Banana peel.",
     "sisa_nasi": "Leftover cooked rice.",
     "sisa_sayur": "Leftover cooked or raw vegetables.",
@@ -68,18 +68,20 @@ QUESTION = (
     "use that label to choose the matching item."
 )
 
-SUMOPOD_SYSTEM_PROMPT = (
-    "You classify waste from a photo into exactly one item slug.\n"
-    "Items and bins:\n"
-    + "\n".join(
-        f"- {item} ({ITEM_CATEGORY[item]}): {desc}"
-        for item, desc in ITEM_CRITERIA.items()
+
+def build_sumopod_prompt(category_map: dict[str, str], criteria_map: dict[str, str]) -> str:
+    return (
+        "You classify waste from a photo into exactly one item slug.\n"
+        "Items and bins:\n"
+        + "\n".join(
+            f"- {item} ({category_map[item]}): {desc}"
+            for item, desc in criteria_map.items()
+        )
+        + "\nIf text in the photo says 'sampah kaleng minuman' or 'kaleng minuman', "
+        "choose kaleng_minuman.\n"
+        "If past similar cases are provided, treat corrected=true as stronger hints.\n"
+        'Reply with JSON only: {"item": "<slug>", "category": "organic"|"anorganic"|"other"}'
     )
-    + "\nIf text in the photo says 'sampah kaleng minuman' or 'kaleng minuman', "
-    "choose kaleng_minuman.\n"
-    "If past similar cases are provided, treat corrected=true as stronger hints.\n"
-    'Reply with JSON only: {"item": "<slug>", "category": "organic"|"anorganic"|"other"}'
-)
 
 
 def format_similar_context(similar: list) -> str:

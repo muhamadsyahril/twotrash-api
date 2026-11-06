@@ -1,0 +1,133 @@
+{% extends "shell.html" %}
+{% block title %}Item · TwoTrash Admin{% endblock %}
+{% block head %}
+<style>
+  .layout {
+    display: grid; grid-template-columns: minmax(280px, 340px) 1fr;
+    gap: 1.25rem; align-items: start;
+  }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 18px; padding: 1rem 1.1rem;
+  }
+  .panel h2 { margin: 0 0 .85rem; font-size: 1.05rem; }
+  label { display:block; font-size:.8rem; color:var(--muted); margin: 0 0 .35rem; }
+  input, select, textarea {
+    width: 100%; border-radius: 10px; border: 1px solid var(--line);
+    background: #151b12; color: var(--text); padding: .65rem .7rem;
+    font: inherit; margin-bottom: .75rem;
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  .toolbar {
+    display: flex; flex-wrap: wrap; gap: .6rem; justify-content: space-between;
+    align-items: end; margin-bottom: 1rem;
+  }
+  .toolbar form { display: flex; gap: .5rem; align-items: end; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: .7rem .55rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-size: .78rem; font-weight: 600; }
+  td .desc { color: var(--muted); font-size: .82rem; margin-top: .25rem; }
+  .row-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="content-head">
+  <h1>Item katalog</h1>
+  <p class="muted" style="margin:0;">CRUD label yang dipakai klasifikasi Jev/Sumopod dan koreksi kasus.</p>
+</div>
+
+{% if message %}<div class="alert ok">{{ message }}</div>{% endif %}
+{% if error %}<div class="alert err">{{ error }}</div>{% endif %}
+
+<div class="layout">
+  <section class="panel">
+    {% if edit_slug and edit_row %}
+    <h2>Edit item</h2>
+    <form method="post" action="/admin/items/{{ edit_slug }}/update">
+      <label>Slug</label>
+      <input value="{{ edit_slug }}" disabled>
+      <label for="category">Kategori</label>
+      <select id="category" name="category" required>
+        <option value="organic" {% if edit_row.category=='organic' %}selected{% endif %}>organic</option>
+        <option value="anorganic" {% if edit_row.category=='anorganic' %}selected{% endif %}>anorganic</option>
+        <option value="other" {% if edit_row.category=='other' %}selected{% endif %}>other</option>
+      </select>
+      <label for="description">Deskripsi (untuk model)</label>
+      <textarea id="description" name="description" required>{{ edit_row.description }}</textarea>
+      <button class="btn btn-primary" type="submit" style="width:100%">Update</button>
+      <a class="btn btn-ghost" href="/admin/items" style="display:block;text-align:center;margin-top:.5rem">Batal</a>
+    </form>
+    {% else %}
+    <h2>Tambah item</h2>
+    <form method="post" action="/admin/items/create">
+      <label for="slug">Slug</label>
+      <input id="slug" name="slug" placeholder="kaleng_minuman" required pattern="[a-z][a-z0-9_]{1,62}">
+      <label for="category">Kategori</label>
+      <select id="category" name="category" required>
+        <option value="organic">organic</option>
+        <option value="anorganic">anorganic</option>
+        <option value="other">other</option>
+      </select>
+      <label for="description">Deskripsi (untuk model)</label>
+      <textarea id="description" name="description" required placeholder="Deskripsi singkat agar model mengenali item ini"></textarea>
+      <button class="btn btn-primary" type="submit" style="width:100%">Simpan</button>
+    </form>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="toolbar">
+      <div>
+        <strong>{{ items|length }}</strong> <span class="muted">item</span>
+      </div>
+      <form method="get" action="/admin/items">
+        <div>
+          <label for="filter-cat">Filter kategori</label>
+          <select id="filter-cat" name="category" onchange="this.form.submit()">
+            <option value="">Semua</option>
+            <option value="organic" {% if category=='organic' %}selected{% endif %}>organic</option>
+            <option value="anorganic" {% if category=='anorganic' %}selected{% endif %}>anorganic</option>
+            <option value="other" {% if category=='other' %}selected{% endif %}>other</option>
+          </select>
+        </div>
+      </form>
+    </div>
+
+    {% if not items %}
+    <div class="muted">Belum ada item.</div>
+    {% else %}
+    <div style="overflow:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Kategori</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td>
+              <div class="mono">{{ row.slug }}</div>
+              <div class="desc">{{ row.description }}</div>
+            </td>
+            <td><span class="chip {{ row.category }}">{{ row.category }}</span></td>
+            <td>
+              <div class="row-actions">
+                <a class="btn" href="/admin/items?edit={{ row.slug }}{% if category %}&category={{ category }}{% endif %}">Edit</a>
+                <form method="post" action="/admin/items/{{ row.slug }}/delete" onsubmit="return confirm('Hapus item {{ row.slug }}?')">
+                  <button class="btn btn-danger" type="submit">Hapus</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from app import config
 from app.embeddings import embed_image, embedding_backend_name
-from app.prompts import ITEM_CATEGORY
+from app.items_store import items_store
 
 log = logging.getLogger("trash.memory")
 
@@ -133,7 +133,8 @@ class VectorMemory:
         return case_id
 
     def correct(self, case_id: str, item: str) -> dict:
-        if item not in ITEM_CATEGORY:
+        category_map = items_store.category_map()
+        if item not in category_map:
             raise ValueError(f"Item tidak dikenal: {item}")
         if not self.enabled:
             raise RuntimeError("Vector store dimatikan")
@@ -143,7 +144,7 @@ class VectorMemory:
             raise KeyError(case_id)
         meta = dict(existing["metadatas"][0])
         meta["item"] = item
-        meta["category"] = ITEM_CATEGORY[item]
+        meta["category"] = category_map[item]
         meta["corrected"] = "true"
         meta["corrected_at"] = datetime.now(timezone.utc).isoformat()
         embedding = existing["embeddings"][0]

@@ -1,0 +1,37 @@
+{% for c in cases %}
+<article class="card">
+  <div class="thumb">
+    {% if c.has_image %}
+    <img src="/admin/cases/{{ c.id }}/image" alt="{{ c.item }}" loading="lazy">
+    {% else %}
+    <div class="empty">tanpa gambar</div>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <div class="meta">
+      <span class="chip {{ c.category }}">{{ c.category }}</span>
+      <span class="chip">{{ c.item }}</span>
+      {% if c.corrected %}<span class="chip ok">corrected</span>{% endif %}
+    </div>
+    <div class="mono id">{{ c.id }}</div>
+    <div class="muted" style="font-size:.82rem;">
+      source {{ c.source or '-' }}
+      {% if c.confidence %} · conf {{ c.confidence }}{% endif %}
+      {% if c.created_at %}<br>{{ c.created_at }}{% endif %}
+    </div>
+    <form method="post" action="/admin/cases/{{ c.id }}/correct">
+      <input type="hidden" name="category" value="{{ category }}">
+      <input type="hidden" name="corrected" value="{{ corrected }}">
+      <select name="item" required>
+        {% for slug, cat in all_items.items() %}
+        <option value="{{ slug }}" {% if c.item==slug %}selected{% endif %}>{{ slug }} · {{ cat }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-primary" type="submit">Simpan koreksi</button>
+    </form>
+  </div>
+</article>
+{% endfor %}
+{% if has_more %}
+<div id="scroll-sentinel" data-next-page="{{ page + 1 }}" data-total="{{ total }}" aria-hidden="true"></div>
+{% endif %}

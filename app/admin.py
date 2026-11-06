@@ -1,4 +1,4 @@
-"""Admin dashboard: login, daftar kasus vector store, koreksi label."""
+"""Admin dashboard: sidebar, kasus (infinite scroll), CRUD item."""
 
 from __future__ import annotations
 
@@ -12,15 +12,12 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app import config
+from app.items_store import items_store
 from app.memory import memory
-from app.prompts import ITEM_CATEGORY
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
-
-ITEMS_BY_CATEGORY: dict[str, list[str]] = {"organic": [], "anorganic": [], "other": []}
-for _item, _cat in ITEM_CATEGORY.items():
-    ITEMS_BY_CATEGORY.setdefault(_cat, []).append(_item)
+PER_PAGE = 24
 
 
 def _logged_in(request: Request) -> bool:
@@ -31,6 +28,14 @@ def _check_password(username: str, password: str) -> bool:
     user_ok = hmac.compare_digest(username, config.ADMIN_USERNAME)
     pass_ok = hmac.compare_digest(password, config.ADMIN_PASSWORD)
     return user_ok and pass_ok
+
+
+def _all_items() -> dict[str, str]:
+    return items_store.category_map()
+
+
+def _shell_ctx(active: str, **extra):
+    return {"active": active, **extra}
 
 
 @router.get("", response_class=HTMLResponse)
@@ -45,11 +50,7 @@ async def admin_home(request: Request):
 async def login_page(request: Request, error: str | None = None):
     if _logged_in(request):
         return RedirectResponse("/admin/cases", status_code=303)
-    return TEMPLATES.TemplateResponse(
-        request,
-        "login.html",
-        {"error": error},
-    )
+    return TEMPLATES.TemplateResponse(request, "login.html", {"error": error})
 
 
 @router.post("/login")
@@ -76,6 +77,22 @@ async def logout(request: Request):
     return RedirectResponse("/admin/login", status_code=303)
 
 
+def _parse_case_filters(
+    category: str | None,
+    corrected: str | None,
+    item: str | None,
+):
+    corrected_filter: bool | None = None
+    if corrected == "1":
+        corrected_filter = True
+    elif corrected == "0":
+        corrected_filter = False
+    cat = category if category in ("organic", "anorganic", "other") else None
+    catalog = _all_items()
+    item_filter = item if item in catalog else None
+    return cat, corrected_filter, item_filter, catalog
+
+
 @router.get("/cases", response_class=HTMLResponse)
 async def cases_page(
     request: Request,
@@ -87,20 +104,14 @@ async def cases_page(
     if not _logged_in(request):
         return RedirectResponse("/admin/login", status_code=303)
 
-    per_page = 24
-    corrected_filter: bool | None = None
-    if corrected == "1":
-        corrected_filter = True
-    elif corrected == "0":
-        corrected_filter = False
-
-    cat = category if category in ("organic", "anorganic", "other") else None
-    item_filter = item if item in ITEM_CATEGORY else None
+    cat, corrected_filter, item_filter, catalog = _parse_case_filters(category, corrected, item)
+    error = request.query_params.get("err")
+    message = request.query_params.get("ok")
 
     try:
         rows, total = memory.list_cases(
-            limit=per_page,
-            offset=(page - 1) * per_page,
+            limit=PER_PAGE,
+            offset=(page - 1) * PER_PAGE,
             category=cat,
             corrected=corrected_filter,
             item=item_filter,
@@ -110,39 +121,74 @@ async def cases_page(
         return TEMPLATES.TemplateResponse(
             request,
             "cases.html",
-            {
-                "cases": [],
-                "total": 0,
-                "page": 1,
-                "pages": 1,
-                "stats": {"enabled": False, "error": str(exc)},
-                "category": cat or "",
-                "corrected": corrected or "",
-                "item": item_filter or "",
-                "items_by_category": ITEMS_BY_CATEGORY,
-                "all_items": ITEM_CATEGORY,
-                "message": None,
-                "error": f"Gagal membaca vector store: {exc}",
-            },
+            _shell_ctx(
+                "cases",
+                cases=[],
+                total=0,
+                page=1,
+                has_more=False,
+                stats={"enabled": False, "error": str(exc)},
+                category=cat or "",
+                corrected=corrected or "",
+                item=item_filter or "",
+                all_items=catalog,
+                message=None,
+                error=f"Gagal membaca vector store: {exc}",
+            ),
         )
 
-    pages = max(1, (total + per_page - 1) // per_page)
+    has_more = page * PER_PAGE < total
     return TEMPLATES.TemplateResponse(
         request,
         "cases.html",
+        _shell_ctx(
+            "cases",
+            cases=rows,
+            total=total,
+            page=page,
+            has_more=has_more,
+            stats=stats,
+            category=cat or "",
+            corrected=corrected or "",
+            item=item_filter or "",
+            all_items=catalog,
+            message=message,
+            error=error,
+        ),
+    )
+
+
+@router.get("/cases/fragment", response_class=HTMLResponse)
+async def cases_fragment(
+    request: Request,
+    category: str | None = Query(None),
+    corrected: str | None = Query(None),
+    item: str | None = Query(None),
+    page: int = Query(1, ge=1),
+):
+    if not _logged_in(request):
+        raise HTTPException(status_code=401, detail="Login dulu")
+
+    cat, corrected_filter, item_filter, catalog = _parse_case_filters(category, corrected, item)
+    rows, total = memory.list_cases(
+        limit=PER_PAGE,
+        offset=(page - 1) * PER_PAGE,
+        category=cat,
+        corrected=corrected_filter,
+        item=item_filter,
+    )
+    has_more = page * PER_PAGE < total
+    return TEMPLATES.TemplateResponse(
+        request,
+        "cases_cards.html",
         {
             "cases": rows,
-            "total": total,
-            "page": page,
-            "pages": pages,
-            "stats": stats,
+            "all_items": catalog,
             "category": cat or "",
             "corrected": corrected or "",
-            "item": item_filter or "",
-            "items_by_category": ITEMS_BY_CATEGORY,
-            "all_items": ITEM_CATEGORY,
-            "message": request.query_params.get("ok"),
-            "error": request.query_params.get("err"),
+            "page": page,
+            "has_more": has_more,
+            "total": total,
         },
     )
 
@@ -164,21 +210,18 @@ async def correct_case(
     item: Annotated[str, Form()],
     category: str = Form(""),
     corrected: str = Form(""),
-    page: int = Form(1),
 ):
     if not _logged_in(request):
         return RedirectResponse("/admin/login", status_code=303)
 
-    qs = {}
+    qs: dict[str, str] = {}
     if category:
         qs["category"] = category
     if corrected:
         qs["corrected"] = corrected
-    if page > 1:
-        qs["page"] = str(page)
 
     slug = item.lower().strip()
-    if slug not in ITEM_CATEGORY:
+    if slug not in _all_items():
         qs["err"] = "Item tidak dikenal"
         return RedirectResponse(f"/admin/cases?{urlencode(qs)}", status_code=303)
 
@@ -191,3 +234,81 @@ async def correct_case(
         qs["err"] = str(exc)
 
     return RedirectResponse(f"/admin/cases?{urlencode(qs)}", status_code=303)
+
+
+@router.get("/items", response_class=HTMLResponse)
+async def items_page(
+    request: Request,
+    category: str | None = Query(None),
+    edit: str | None = Query(None),
+):
+    if not _logged_in(request):
+        return RedirectResponse("/admin/login", status_code=303)
+
+    cat = category if category in ("organic", "anorganic", "other") else None
+    rows = items_store.list_rows(cat)
+    edit_row = items_store.get(edit) if edit else None
+    edit_slug = edit if edit_row else None
+    return TEMPLATES.TemplateResponse(
+        request,
+        "items.html",
+        _shell_ctx(
+            "items",
+            items=rows,
+            category=cat or "",
+            edit_slug=edit_slug,
+            edit_row=edit_row,
+            message=request.query_params.get("ok"),
+            error=request.query_params.get("err"),
+        ),
+    )
+
+
+@router.post("/items/create")
+async def items_create(
+    request: Request,
+    slug: Annotated[str, Form()],
+    category: Annotated[str, Form()],
+    description: Annotated[str, Form()],
+):
+    if not _logged_in(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    try:
+        row = items_store.create(slug, category, description)
+        qs = {"ok": f"Item dibuat: {row['slug']}"}
+    except Exception as exc:  # noqa: BLE001
+        qs = {"err": str(exc)}
+    return RedirectResponse(f"/admin/items?{urlencode(qs)}", status_code=303)
+
+
+@router.post("/items/{slug}/update")
+async def items_update(
+    request: Request,
+    slug: str,
+    category: Annotated[str, Form()],
+    description: Annotated[str, Form()],
+):
+    if not _logged_in(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    try:
+        row = items_store.update(slug, category, description)
+        qs = {"ok": f"Item diupdate: {row['slug']}"}
+    except KeyError:
+        qs = {"err": "Item tidak ditemukan"}
+    except Exception as exc:  # noqa: BLE001
+        qs = {"err": str(exc)}
+    return RedirectResponse(f"/admin/items?{urlencode(qs)}", status_code=303)
+
+
+@router.post("/items/{slug}/delete")
+async def items_delete(request: Request, slug: str):
+    if not _logged_in(request):
+        return RedirectResponse("/admin/login", status_code=303)
+    try:
+        items_store.delete(slug)
+        qs = {"ok": f"Item dihapus: {slug}"}
+    except KeyError:
+        qs = {"err": "Item tidak ditemukan"}
+    except Exception as exc:  # noqa: BLE001
+        qs = {"err": str(exc)}
+    return RedirectResponse(f"/admin/items?{urlencode(qs)}", status_code=303)

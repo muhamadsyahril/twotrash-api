@@ -12,8 +12,8 @@ from app import config
 from app.admin import router as admin_router
 from app.classifiers import ClassifierError, classify
 from app.image_utils import InvalidImageError, prepare_jpeg
+from app.items_store import items_store
 from app.memory import memory
-from app.prompts import ITEM_CATEGORY
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("trash.api")
@@ -119,7 +119,7 @@ async def classify_image(request: Request, image: UploadFile | None = File(None)
 async def feedback(body: FeedbackBody):
     """Koreksi label kasus tersimpan — dipakai untuk tuning few-shot berikutnya."""
     item = body.item.lower().strip()
-    if item not in ITEM_CATEGORY:
+    if item not in items_store.category_map():
         raise HTTPException(status_code=400, detail=f"Item tidak dikenal: {item}")
     try:
         return memory.correct(body.id, item)

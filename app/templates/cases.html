@@ -1,19 +1,15 @@
-{% extends "base.html" %}
+{% extends "shell.html" %}
 {% block title %}Kasus · TwoTrash Admin{% endblock %}
 {% block head %}
 <style>
-  .stats {
-    display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0 1.25rem;
-  }
+  .stats { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0 0 1rem; }
   .filters {
-    display: grid; grid-template-columns: repeat(4, minmax(0,1fr)) auto;
+    display: grid; grid-template-columns: repeat(3, minmax(0,1fr)) auto;
     gap: .75rem; align-items: end;
     background: var(--panel); border: 1px solid var(--line);
     border-radius: var(--radius); padding: 1rem; margin-bottom: 1.25rem;
   }
-  @media (max-width: 900px) {
-    .filters { grid-template-columns: 1fr 1fr; }
-  }
+  @media (max-width: 900px) { .filters { grid-template-columns: 1fr 1fr; } }
   .filters label { display:block; font-size:.8rem; color:var(--muted); margin-bottom:.35rem; }
   .filters select {
     width: 100%; border-radius: 10px; border: 1px solid var(--line);
@@ -21,7 +17,7 @@
   }
   .grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 1rem; padding-bottom: 3rem;
+    gap: 1rem; padding-bottom: 2rem;
   }
   .card {
     background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
@@ -42,122 +38,134 @@
     border-radius: 10px; border: 1px solid var(--line); background: #151b12;
     color: var(--text); padding: .55rem .65rem; font: inherit;
   }
-  .pager {
-    display: flex; justify-content: space-between; align-items: center;
-    gap: 1rem; margin: 0 0 1.5rem; color: var(--muted);
-  }
   .empty-state {
     border: 1px dashed var(--line); border-radius: var(--radius);
     padding: 2.5rem 1rem; text-align: center; color: var(--muted);
   }
+  #scroll-status { text-align: center; color: var(--muted); padding: .5rem 0 1.5rem; min-height: 1.5rem; }
+  #scroll-sentinel { height: 1px; width: 100%; grid-column: 1 / -1; }
 </style>
 {% endblock %}
-{% block body %}
-<div class="wrap">
-  <div class="topbar">
-    <div class="brand">TwoTrash <span>admin</span></div>
-    <form method="post" action="/admin/logout">
-      <button class="btn btn-ghost" type="submit">Logout</button>
-    </form>
-  </div>
-
-  <h1 style="margin:.4rem 0 .25rem; letter-spacing:-.03em;">Kasus vector memory</h1>
-  <p class="muted" style="margin:0;">Koreksi label dipakai sebagai few-shot untuk klasifikasi berikutnya.</p>
-
-  <div class="stats">
-    <span class="chip">total {{ stats.get('count', total) }}</span>
-    <span class="chip">embedding {{ stats.get('embedding', '-') }}</span>
-    <span class="chip">{{ 'store on' if stats.get('enabled') else 'store off' }}</span>
-  </div>
-
-  {% if message %}<div class="alert ok">{{ message }}</div>{% endif %}
-  {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
-
-  <form class="filters" method="get" action="/admin/cases">
-    <div>
-      <label for="category">Kategori</label>
-      <select id="category" name="category">
-        <option value="">Semua</option>
-        <option value="organic" {% if category=='organic' %}selected{% endif %}>organic</option>
-        <option value="anorganic" {% if category=='anorganic' %}selected{% endif %}>anorganic</option>
-        <option value="other" {% if category=='other' %}selected{% endif %}>other</option>
-      </select>
-    </div>
-    <div>
-      <label for="item">Item</label>
-      <select id="item" name="item">
-        <option value="">Semua</option>
-        {% for slug, cat in all_items.items() %}
-        <option value="{{ slug }}" {% if item==slug %}selected{% endif %}>{{ slug }} ({{ cat }})</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label for="corrected">Status</label>
-      <select id="corrected" name="corrected">
-        <option value="">Semua</option>
-        <option value="1" {% if corrected=='1' %}selected{% endif %}>Sudah dikoreksi</option>
-        <option value="0" {% if corrected=='0' %}selected{% endif %}>Belum dikoreksi</option>
-      </select>
-    </div>
-    <div>
-      <label>&nbsp;</label>
-      <button class="btn" type="submit" style="width:100%">Filter</button>
-    </div>
-  </form>
-
-  <div class="pager">
-    <div>Menampilkan {{ cases|length }} dari {{ total }} · halaman {{ page }}/{{ pages }}</div>
-    <div style="display:flex; gap:.5rem;">
-      {% if page > 1 %}
-      <a class="btn" href="/admin/cases?category={{ category }}&item={{ item }}&corrected={{ corrected }}&page={{ page-1 }}">Prev</a>
-      {% endif %}
-      {% if page < pages %}
-      <a class="btn" href="/admin/cases?category={{ category }}&item={{ item }}&corrected={{ corrected }}&page={{ page+1 }}">Next</a>
-      {% endif %}
-    </div>
-  </div>
-
-  {% if not cases %}
-  <div class="empty-state">Belum ada kasus. Kirim gambar lewat <span class="mono">POST /classify</span> dulu.</div>
-  {% else %}
-  <div class="grid">
-    {% for c in cases %}
-    <article class="card">
-      <div class="thumb">
-        {% if c.has_image %}
-        <img src="/admin/cases/{{ c.id }}/image" alt="{{ c.item }}" loading="lazy">
-        {% else %}
-        <div class="empty">tanpa gambar</div>
-        {% endif %}
-      </div>
-      <div class="card-body">
-        <div class="meta">
-          <span class="chip {{ c.category }}">{{ c.category }}</span>
-          <span class="chip">{{ c.item }}</span>
-          {% if c.corrected %}<span class="chip ok">corrected</span>{% endif %}
-        </div>
-        <div class="mono id">{{ c.id }}</div>
-        <div class="muted" style="font-size:.82rem;">
-          source {{ c.source or '-' }}
-          {% if c.confidence %} · conf {{ c.confidence }}{% endif %}
-          {% if c.created_at %}<br>{{ c.created_at }}{% endif %}
-        </div>
-        <form method="post" action="/admin/cases/{{ c.id }}/correct">
-          <input type="hidden" name="category" value="{{ category }}">
-          <input type="hidden" name="corrected" value="{{ corrected }}">
-          <input type="hidden" name="page" value="{{ page }}">
-          <select name="item" required>
-            {% for slug, cat in all_items.items() %}
-            <option value="{{ slug }}" {% if c.item==slug %}selected{% endif %}>{{ slug }} · {{ cat }}</option>
-            {% endfor %}
-          </select>
-          <button class="btn btn-primary" type="submit">Simpan koreksi</button>
-        </form>
-      </div>
-    </article>
-    {% endfor %}
-  </div>
-  {% endif %}
+{% block content %}
+<div class="content-head">
+  <h1>Kasus vector memory</h1>
+  <p class="muted" style="margin:0;">Scroll ke bawah untuk memuat lebih banyak. Koreksi label dipakai few-shot berikutnya.</p>
 </div>
+
+<div class="stats">
+  <span class="chip">total {{ stats.get('count', total) }}</span>
+  <span class="chip">embedding {{ stats.get('embedding', '-') }}</span>
+  <span class="chip">{{ 'store on' if stats.get('enabled') else 'store off' }}</span>
+</div>
+
+{% if message %}<div class="alert ok">{{ message }}</div>{% endif %}
+{% if error %}<div class="alert err">{{ error }}</div>{% endif %}
+
+<form class="filters" method="get" action="/admin/cases">
+  <div>
+    <label for="category">Kategori</label>
+    <select id="category" name="category">
+      <option value="">Semua</option>
+      <option value="organic" {% if category=='organic' %}selected{% endif %}>organic</option>
+      <option value="anorganic" {% if category=='anorganic' %}selected{% endif %}>anorganic</option>
+      <option value="other" {% if category=='other' %}selected{% endif %}>other</option>
+    </select>
+  </div>
+  <div>
+    <label for="item">Item</label>
+    <select id="item" name="item">
+      <option value="">Semua</option>
+      {% for slug, cat in all_items.items() %}
+      <option value="{{ slug }}" {% if item==slug %}selected{% endif %}>{{ slug }} ({{ cat }})</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="corrected">Status</label>
+    <select id="corrected" name="corrected">
+      <option value="">Semua</option>
+      <option value="1" {% if corrected=='1' %}selected{% endif %}>Sudah dikoreksi</option>
+      <option value="0" {% if corrected=='0' %}selected{% endif %}>Belum dikoreksi</option>
+    </select>
+  </div>
+  <div>
+    <label>&nbsp;</label>
+    <button class="btn" type="submit" style="width:100%">Filter</button>
+  </div>
+</form>
+
+{% if not cases %}
+<div class="empty-state">Belum ada kasus. Kirim gambar lewat <span class="mono">POST /classify</span> dulu.</div>
+{% else %}
+<div id="cases-grid" class="grid"
+     data-category="{{ category }}"
+     data-item="{{ item }}"
+     data-corrected="{{ corrected }}"
+     data-page="{{ page }}"
+     data-has-more="{{ '1' if has_more else '0' }}">
+  {% include "cases_cards.html" %}
+</div>
+<div id="scroll-status"></div>
+{% endif %}
+
+<script>
+(() => {
+  const grid = document.getElementById("cases-grid");
+  if (!grid) return;
+  const status = document.getElementById("scroll-status");
+  let loading = false;
+  let hasMore = grid.dataset.hasMore === "1";
+  let page = Number(grid.dataset.page || "1");
+
+  const params = () => {
+    const q = new URLSearchParams();
+    if (grid.dataset.category) q.set("category", grid.dataset.category);
+    if (grid.dataset.item) q.set("item", grid.dataset.item);
+    if (grid.dataset.corrected) q.set("corrected", grid.dataset.corrected);
+    return q;
+  };
+
+  const observe = () => {
+    const sentinel = document.getElementById("scroll-sentinel");
+    if (!sentinel || !hasMore) return;
+    observer.observe(sentinel);
+  };
+
+  const loadMore = async () => {
+    if (loading || !hasMore) return;
+    loading = true;
+    status.textContent = "Memuat…";
+    const next = page + 1;
+    const q = params();
+    q.set("page", String(next));
+    try {
+      const res = await fetch(`/admin/cases/fragment?${q.toString()}`, {
+        headers: { "Accept": "text/html" },
+      });
+      if (!res.ok) throw new Error("Gagal memuat");
+      const html = await res.text();
+      const old = document.getElementById("scroll-sentinel");
+      if (old) old.remove();
+      grid.insertAdjacentHTML("beforeend", html);
+      page = next;
+      grid.dataset.page = String(page);
+      hasMore = !!document.getElementById("scroll-sentinel");
+      grid.dataset.hasMore = hasMore ? "1" : "0";
+      status.textContent = hasMore ? "" : "Semua kasus sudah ditampilkan";
+      observe();
+    } catch (err) {
+      status.textContent = "Gagal memuat halaman berikutnya";
+    } finally {
+      loading = false;
+    }
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    if (entries.some((e) => e.isIntersecting)) loadMore();
+  }, { rootMargin: "240px 0px" });
+
+  observe();
+  if (!hasMore) status.textContent = "Semua kasus sudah ditampilkan";
+})();
+</script>
 {% endblock %}
